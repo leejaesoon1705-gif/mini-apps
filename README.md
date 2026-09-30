@@ -7,5 +7,3 @@
 - 별 피하기 게임 (`star-dodge.html`)
 
 `mini-apps/index.html`을 브라우저에서 열면 됩니다.
-
-잘못 추가한 줄
