@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>집중 타이머</title>
+<style>
+  :root { --bg:#fff7f2; --card:#fff; --text:#2b2320; --muted:#8a7d77; --accent:#e5533d; --break:#2a9d8f; --line:#f0e4dd; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#1a1614; --card:#26201d; --text:#f3ebe7; --muted:#a8998f; --line:#3a312c; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:"Segoe UI","Malgun Gothic",system-ui,sans-serif;
+         display:flex; justify-content:center; padding:32px 16px; min-height:100vh; }
+  main { width:100%; max-width:440px; }
+  a.back { color:var(--muted); text-decoration:none; font-size:.9rem; }
+  .card { background:var(--card); border-radius:20px; padding:24px; margin-top:16px; box-shadow:0 4px 20px #0000000d; border:1px solid var(--line); }
+  .modes { display:flex; gap:8px; justify-content:center; }
+  .modes button { border:none; background:transparent; color:var(--muted); padding:8px 14px; border-radius:999px; cursor:pointer; font:inherit; }
+  .modes button.on { background:var(--mode); color:#fff; }
+  .ring { position:relative; width:240px; height:240px; margin:24px auto 12px; }
+  .ring svg { transform:rotate(-90deg); }
+  .ring .time { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .time b { font-size:3.2rem; font-variant-numeric:tabular-nums; font-weight:600; }
+  .time span { color:var(--muted); font-size:.9rem; max-width:180px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .controls { display:flex; gap:10px; justify-content:center; }
+  .controls button { font:inherit; border:none; border-radius:12px; padding:12px 24px; cursor:pointer; }
+  #startBtn { background:var(--mode); color:#fff; min-width:120px; font-weight:600; }
+  #resetBtn, #skipBtn { background:var(--line); color:var(--text); }
+  .stats { text-align:center; color:var(--muted); margin-top:14px; font-size:.9rem; }
+  h3 { margin:0 0 12px; font-size:1rem; }
+  form { display:flex; gap:8px; }
+  form input { flex:1; font:inherit; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); }
+  form button { font:inherit; border:none; border-radius:10px; padding:0 16px; background:var(--text); color:var(--card); cursor:pointer; }
+  ul { list-style:none; padding:0; margin:14px 0 0; }
+  li { display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius:10px; cursor:pointer; }
+  li:hover { background:var(--bg); }
+  li.active { outline:2px solid var(--mode); }
+  li.done .txt { text-decoration:line-through; color:var(--muted); }
+  li .txt { flex:1; word-break:break-all; }
+  li .poms { color:var(--accent); font-size:.8rem; }
+  li .del { border:none; background:none; color:var(--muted); cursor:pointer; font-size:1rem; }
+  li input { width:18px; height:18px; accent-color:var(--break); }
+  .empty { color:var(--muted); text-align:center; padding:12px; font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="index.html">← 모음으로</a>
+  <div class="card">
+    <div class="modes" id="modes">
+      <button data-mode="focus">집중 25분</button>
+      <button data-mode="short">짧은 휴식 5분</button>
+      <button data-mode="long">긴 휴식 15분</button>
+    </div>
+    <div class="ring">
+      <svg width="240" height="240">
+        <circle cx="120" cy="120" r="108" fill="none" stroke="var(--line)" stroke-width="10"/>
+        <circle id="prog" cx="120" cy="120" r="108" fill="none" stroke="var(--mode)" stroke-width="10" stroke-linecap="round"/>
+      </svg>
+      <div class="time"><b id="clock">25:00</b><span id="current">할 일을 선택하세요</span></div>
+    </div>
+    <div class="controls">
+      <button id="resetBtn" title="리셋">↺</button>
+      <button id="startBtn">시작</button>
+      <button id="skipBtn" title="건너뛰기">⏭</button>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="card">
+    <h3>오늘의 할 일 <small style="color:var(--muted);font-weight:normal">(클릭해서 집중 대상으로 선택)</small></h3>
+    <form id="form"><input id="input" placeholder="무엇에 집중할까요?" maxlength="80" autocomplete="off"><button>추가</button></form>
+    <ul id="list"></ul>
+  </div>
+</main>
+<script>
+const MODES = { focus:{min:25,color:'#e5533d',label:'집중'}, short:{min:5,color:'#2a9d8f',label:'짧은 휴식'}, long:{min:15,color:'#457b9d',label:'긴 휴식'} };
+const C = 2 * Math.PI * 108;
+const $ = id => document.getElementById(id);
+const prog = $('prog'); prog.style.strokeDasharray = C;
+
+function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+const today = new Date().toDateString();
+let state = load('ft-state', {});
+if (state.day !== today) state = { day: today, sessions: 0, minutes: 0 };
+let tasks = load('ft-tasks', []);
+let activeId = load('ft-active', null);
+let mode = 'focus', total = 0, remaining = 0, endAt = null, tick = null;
+
+function setMode(m) {
+  mode = m; stop();
+  total = remaining = MODES[m].min * 60;
+  document.documentElement.style.setProperty('--mode', MODES[m].color);
+  document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  render();
+}
+function fmt(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+function render() {
+  $('clock').textContent = fmt(remaining);
+  prog.style.strokeDashoffset = C * (1 - remaining / total);
+  $('startBtn').textContent = tick ? '일시정지' : (remaining < total ? '계속' : '시작');
+  document.title = (tick ? fmt(remaining) + ' · ' : '') + '집중 타이머';
+  const t = tasks.find(t => t.id === activeId);
+  $('current').textContent = mode === 'focus' ? (t ? t.text : '할 일을 선택하세요') : MODES[mode].label + ' 중 ☕';
+  $('stats').textContent = `오늘 완료한 집중 세션: ${state.sessions}회 · ${state.minutes}분`;
+}
+function start() {
+  endAt = Date.now() + remaining * 1000;
+  tick = setInterval(() => {
+    remaining = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+    if (remaining === 0) finish(); else render();
+  }, 250);
+  render();
+}
+function stop() { clearInterval(tick); tick = null; }
+function beep() {
+  try {
+    const ac = new AudioContext();
+    [0, .25, .5].forEach(d => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = 880; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(.2, ac.currentTime + d); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + d + .2);
+      o.start(ac.currentTime + d); o.stop(ac.currentTime + d + .2);
+    });
+  } catch {}
+}
+function finish() {
+  stop(); beep();
+  if (mode === 'focus') {
+    state.sessions++; state.minutes += MODES.focus.min; save('ft-state', state);
+    const t = tasks.find(t => t.id === activeId);
+    if (t) { t.poms = (t.poms || 0) + 1; save('ft-tasks', tasks); renderTasks(); }
+    setMode(state.sessions % 4 === 0 ? 'long' : 'short');
+  } else setMode('focus');
+  if (Notification?.permission === 'granted') new Notification(mode === 'focus' ? '휴식 끝! 다시 집중해볼까요?' : '집중 세션 완료! 잠깐 쉬세요 🎉');
+}
+
+function renderTasks() {
+  const ul = $('list'); ul.innerHTML = '';
+  if (!tasks.length) { ul.innerHTML = '<div class="empty">아직 할 일이 없어요</div>'; return; }
+  for (const t of tasks) {
+    const li = document.createElement('li');
+    li.className = (t.done ? 'done ' : '') + (t.id === activeId ? 'active' : '');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = t.done;
+    cb.onclick = e => { e.stopPropagation(); t.done = cb.checked; save('ft-tasks', tasks); renderTasks(); };
+    const txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = t.text;
+    const poms = document.createElement('span'); poms.className = 'poms'; poms.textContent = '🍅'.repeat(Math.min(t.poms || 0, 8));
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕'; del.title = '삭제';
+    del.onclick = e => { e.stopPropagation(); tasks = tasks.filter(x => x !== t); if (activeId === t.id) activeId = null; save('ft-tasks', tasks); renderTasks(); render(); };
+    li.onclick = () => { activeId = t.id; save('ft-active', activeId); renderTasks(); render(); };
+    li.append(cb, txt, poms, del); ul.append(li);
+  }
+}
+
+$('form').onsubmit = e => {
+  e.preventDefault();
+  const text = $('input').value.trim(); if (!text) return;
+  const t = { id: Date.now(), text, done: false, poms: 0 };
+  tasks.push(t); if (!activeId) activeId = t.id;
+  save('ft-tasks', tasks); save('ft-active', activeId);
+  $('input').value = ''; renderTasks(); render();
+};
+$('startBtn').onclick = () => {
+  if (window.Notification && Notification.permission === 'default') Notification.requestPermission();
+  tick ? (stop(), render()) : start();
+};
+$('resetBtn').onclick = () => setMode(mode);
+$('skipBtn').onclick = () => { remaining = 0; finish(); };
+document.querySelectorAll('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+document.addEventListener('keydown', e => { if (e.code === 'Space' && e.target.tagName !== 'INPUT') { e.preventDefault(); $('startBtn').click(); } });
+
+setMode('focus'); renderTasks();
+</script>
+</body>
+</html>

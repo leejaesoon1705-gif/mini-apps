@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>미니 앱 모음</title>
+<style>
+  :root { --bg:#0f1020; --card:#1b1d36; --text:#eef; --muted:#9aa0c8; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:radial-gradient(circle at 30% 20%, #26285a, var(--bg) 60%); color:var(--text);
+         font-family:"Segoe UI","Malgun Gothic",system-ui,sans-serif; display:flex; flex-direction:column; align-items:center; padding:48px 16px; }
+  h1 { margin:0 0 8px; font-size:2rem; }
+  p.sub { color:var(--muted); margin:0 0 36px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:20px; width:100%; max-width:860px; }
+  a.card { display:block; background:var(--card); border-radius:18px; padding:28px 24px; text-decoration:none; color:inherit;
+           border:1px solid #ffffff14; transition:transform .15s, box-shadow .15s; }
+  a.card:hover { transform:translateY(-4px); box-shadow:0 12px 30px #0006; }
+  .emoji { font-size:2.6rem; }
+  .tag { font-size:.75rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:12px; }
+  h2 { margin:4px 0 8px; font-size:1.25rem; }
+  .card p { margin:0; color:var(--muted); line-height:1.5; font-size:.95rem; }
+</style>
+</head>
+<body>
+  <h1>✨ 미니 앱 모음</h1>
+  <p class="sub">하나 골라서 바로 써 보세요</p>
+  <div class="grid">
+    <a class="card" href="focus-timer.html">
+      <div class="emoji">🍅</div><div class="tag">생산성</div>
+      <h2>집중 타이머</h2><p>뽀모도로 타이머와 할 일 목록. 완료한 세션이 기록돼요.</p>
+    </a>
+    <a class="card" href="kaleidoscope.html">
+      <div class="emoji">🎨</div><div class="tag">창의 장난감</div>
+      <h2>만화경 그림판</h2><p>한 번 그으면 여러 방향으로 대칭되는 무지개 만다라.</p>
+    </a>
+    <a class="card" href="star-dodge.html">
+      <div class="emoji">🚀</div><div class="tag">게임</div>
+      <h2>별똥별 피하기</h2><p>운석을 피하고 별을 모으세요. 갈수록 빨라져요!</p>
+    </a>
+  </div>
+</body>
+</html>
